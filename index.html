@@ -9,34 +9,50 @@
 @font-face{font-family:"GenRyuMin";font-weight:500;src:url(fonts/GenRyuMin2TW-M.woff2) format("woff2");font-display:swap}
 @font-face{font-family:"GenRyuMin";font-weight:700;src:url(fonts/GenRyuMin2TW-B.woff2) format("woff2");font-display:swap}
 
-:root{--bg:#f6f4ef;--card:#fff;--ink:#222;--sub:#777;--line:#ddd8cc;--accent:#8b3a2f}
+:root{--bg:#f6f4ef;--card:#fff;--ink:#222;--sub:#777;--line:#ddd8cc;--accent:#8b3a2f;--accent-ink:#fff}
 @media (prefers-color-scheme:dark){
-  :root{--bg:#18181a;--card:#242427;--ink:#eee;--sub:#999;--line:#3a3a3f;--accent:#e0907f}
+  :root{--bg:#18181a;--card:#242427;--ink:#eee;--sub:#999;--line:#3a3a3f;--accent:#e0907f;--accent-ink:#18181a}
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif;
-  padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+  padding:max(16px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom))}
 main{max-width:520px;margin:0 auto;display:grid;gap:14px}
 h1{font-size:20px;margin:8px 0 0}
-label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
+label,.lbl{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
 textarea,select{width:100%;font-size:16px;padding:12px;border:1px solid var(--line);
   border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit}
 textarea{min-height:90px;resize:vertical}
 .row{display:flex;gap:10px;align-items:end}
 .row>div:first-child{flex:1}
 input[type=color]{width:48px;height:46px;padding:2px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-#out{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:20px 16px;
-  min-height:120px;font-size:32px;line-height:1.5;word-break:break-word;white-space:pre-wrap;
-  font-family:"Times New Roman",Times,"Liberation Serif","GenRyuMin",serif;cursor:pointer;
+input[type=color]:disabled{opacity:.4}
+
+#out{border:1px dashed var(--line);border-radius:12px;padding:12px;min-height:120px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:repeating-conic-gradient(#e8e8e8 0 25%,#fff 0 50%) 0 0/16px 16px;
   -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-#out:empty::before{content:"轉換結果會顯示在這裡";color:var(--sub);font:14px system-ui,sans-serif}
 #out:active{opacity:.7}
+#cv{max-width:100%;height:auto;display:block}
 .hint{font-size:13px;color:var(--sub);text-align:center;margin:0}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:14px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg button{font-size:14px;padding:10px 0;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px}
+.sl label{margin:0}
+.sl output{font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+.sl input{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:4px 0}
+.sl.off{opacity:.4}
+.check{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--ink);margin:0}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.bgrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
 #toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translate(-50%,20px);
   background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;
   opacity:0;pointer-events:none;transition:.25s}
 #toast.show{opacity:1;transform:translate(-50%,0)}
-button{font-size:14px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--accent);width:100%}
+.dl{font-size:14px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--accent);width:100%}
 </style>
 </head>
 <body>
@@ -58,28 +74,178 @@ button{font-size:14px;padding:10px;border:1px solid var(--line);border-radius:10
       </select>
     </div>
     <div>
-      <label for="clr">顏色</label>
+      <label for="clr">文字顏色</label>
       <input id="clr" type="color" value="#000000">
     </div>
   </div>
 
-  <div id="out" role="button" tabindex="0" aria-label="點擊複製透明背景 PNG"></div>
-  <p class="hint">點一下上方文字，複製透明背景 PNG</p>
-  <button id="dl" type="button">下載 PNG</button>
+  <div id="out" role="button" tabindex="0" aria-label="點擊複製透明背景 PNG"><canvas id="cv"></canvas></div>
+  <p class="hint">點一下上方預覽，複製 PNG（棋盤格 = 透明）</p>
+
+  <div class="panel">
+    <div>
+      <span class="lbl">對齊</span>
+      <div class="seg" id="align">
+        <button type="button" data-a="left" aria-pressed="false">靠左</button>
+        <button type="button" data-a="center" aria-pressed="true">置中</button>
+        <button type="button" data-a="right" aria-pressed="false">靠右</button>
+        <button type="button" data-a="justify" aria-pressed="false">兩端對齊</button>
+      </div>
+    </div>
+    <div class="sl">
+      <label for="ls">字元間距</label><output id="lsv"></output>
+      <input id="ls" type="range" min="-5" max="40" step="1" value="0">
+    </div>
+    <div class="sl">
+      <label for="lh">行距</label><output id="lhv"></output>
+      <input id="lh" type="range" min="1" max="3" step="0.1" value="1.5">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="bgrow">
+      <label class="check"><input id="bgOn" type="checkbox">背景填色</label>
+      <input id="bgClr" type="color" value="#ffffff" disabled>
+    </div>
+    <div class="sl">
+      <label for="pad">背景框大小（文字外的留白）</label><output id="padv"></output>
+      <input id="pad" type="range" min="0" max="120" step="2" value="16">
+    </div>
+    <div class="sl off" id="radWrap">
+      <label for="rad">圓角（0 = 直角）</label><output id="radv"></output>
+      <input id="rad" type="range" min="0" max="120" step="2" value="0" disabled>
+    </div>
+  </div>
+
+  <button class="dl" id="dl" type="button">下載 PNG</button>
 </main>
 <div id="toast"></div>
 
 <script>
 const FAMILY = '"Times New Roman", Times, "Liberation Serif", "GenRyuMin", serif';
 const $ = id => document.getElementById(id);
-const txt = $("txt"), wt = $("wt"), clr = $("clr"), out = $("out"), toast = $("toast");
+const cv = $("cv"), toast = $("toast");
+let align = "center";
 
-function render() {
-  out.textContent = txt.value;
-  out.style.fontWeight = wt.value;
-  out.style.color = clr.value;
+const S = 3;            // 輸出解析度倍率
+const BASE = 64;        // 基準字級 (px)
+const MAX_LINE = 1000;  // 單行最大寬度 (px)
+
+function readOpts() {
+  return {
+    text: $("txt").value,
+    weight: $("wt").value,
+    color: $("clr").value,
+    align,
+    ls: +$("ls").value,
+    lh: +$("lh").value,
+    bgOn: $("bgOn").checked,
+    bgColor: $("bgClr").value,
+    pad: +$("pad").value,
+    rad: +$("rad").value,
+  };
 }
-[txt, wt, clr].forEach(el => el.addEventListener("input", render));
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+async function draw() {
+  const o = readOpts();
+  const text = o.text.replace(/\s+$/, "");
+  if (!text) { cv.width = cv.height = 0; return false; }
+
+  const size = BASE * S;
+  const font = `${o.weight} ${size}px ${FAMILY}`;
+  try { await document.fonts.load(font, text); } catch {}
+
+  const ctx = cv.getContext("2d");
+  ctx.font = font;
+  const ls = o.ls * S, pad = o.pad * S;
+  const adv = ch => ctx.measureText(ch).width;
+  const width = str => {
+    const chars = [...str];
+    if (!ls) return ctx.measureText(str).width;
+    return chars.reduce((s, c) => s + adv(c), 0) + ls * (chars.length - 1);
+  };
+
+  // 逐字換行，保留使用者的換行
+  const lines = [];
+  for (const para of text.split("\n")) {
+    let line = "";
+    for (const ch of para) {
+      if (line && width(line + ch) > MAX_LINE * S) { lines.push(line); line = ""; }
+      line += ch;
+    }
+    lines.push(line);
+  }
+
+  const lineH = size * o.lh;
+  const vExtra = Math.max(0, size * 1.2 - lineH) / 2;   // 行距小於 1.2 時避免字被裁切
+  const blockW = Math.ceil(Math.max(...lines.map(width)));
+  const W = blockW + pad * 2;
+  const H = Math.ceil(lineH * lines.length + vExtra * 2 + pad * 2);
+
+  cv.width = W; cv.height = H;    // 重設尺寸會清空 context
+  ctx.font = font;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+
+  if (o.bgOn) {
+    ctx.fillStyle = o.bgColor;
+    roundRectPath(ctx, 0, 0, W, H, o.rad * S);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = o.color;
+  lines.forEach((line, i) => {
+    const w = width(line);
+    const y = pad + vExtra + lineH * (i + 0.5);
+    const n = [...line].length;
+    let x = pad, gap = 0;
+    if (o.align === "center") x += (blockW - w) / 2;
+    else if (o.align === "right") x += blockW - w;
+    else if (o.align === "justify" && i < lines.length - 1 && n > 1) gap = (blockW - w) / (n - 1);
+
+    if (!ls && !gap) { ctx.fillText(line, x, y); return; }
+    for (const ch of line) {
+      ctx.fillText(ch, x, y);
+      x += adv(ch) + ls + gap;
+    }
+  });
+  return true;
+}
+
+// 連續輸入時只保留最新一次繪製；複製時等它完成
+let ready = Promise.resolve(true), seq = 0;
+function render() {
+  const mine = ++seq;
+  $("lsv").textContent = $("ls").value + " px";
+  $("lhv").textContent = (+$("lh").value).toFixed(1);
+  $("padv").textContent = $("pad").value + " px";
+  $("radv").textContent = $("rad").value + " px";
+  const on = $("bgOn").checked;
+  $("bgClr").disabled = !on;
+  $("rad").disabled = !on;
+  $("radWrap").classList.toggle("off", !on);
+  ready = ready.then(() => mine === seq ? draw() : true);
+}
+
+document.querySelectorAll("input,select,textarea").forEach(el => el.addEventListener("input", render));
+$("align").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  align = b.dataset.a;
+  $("align").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+});
 render();
 
 let toastTimer;
@@ -90,39 +256,10 @@ function say(msg) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
 }
 
-// 以 3 倍解析度繪製到透明 canvas，回傳 PNG Blob
-async function makePng() {
-  const text = txt.value.trim();
-  if (!text) return null;
-  const size = 64, scale = 3, pad = 16, maxW = 1000;
-  const font = `${wt.value} ${size * scale}px ${FAMILY}`;
-  await document.fonts.load(font, text);
-
-  const c = document.createElement("canvas");
-  const ctx = c.getContext("2d");
-  ctx.font = font;
-
-  // 依最大寬度逐字換行（保留使用者的換行）
-  const lines = [];
-  for (const para of text.split("\n")) {
-    let line = "";
-    for (const ch of para) {
-      if (line && ctx.measureText(line + ch).width > maxW * scale) { lines.push(line); line = ""; }
-      line += ch;
-    }
-    lines.push(line);
-  }
-  const lh = size * scale * 1.5;
-  const w = Math.ceil(Math.max(...lines.map(l => ctx.measureText(l).width))) + pad * 2 * scale;
-  c.width = w;
-  c.height = Math.ceil(lh * lines.length) + pad * 2 * scale;
-
-  ctx.font = font;              // 改變尺寸後 context 會重置
-  ctx.fillStyle = clr.value;
-  ctx.textBaseline = "middle";
-  lines.forEach((l, i) => ctx.fillText(l, pad * scale, pad * scale + lh * (i + 0.5)));
-  return new Promise(r => c.toBlob(r, "image/png"));
-}
+const blobOf = async () => {
+  if (!(await ready)) return null;
+  return new Promise(r => cv.toBlob(r, "image/png"));
+};
 
 function download(blob) {
   const a = document.createElement("a");
@@ -133,22 +270,21 @@ function download(blob) {
 }
 
 async function copyImage() {
-  // Safari 需在點擊當下建立 ClipboardItem，並以 Promise 傳入 blob
-  if (!txt.value.trim()) return say("請先輸入文字");
+  if (!$("txt").value.trim()) return say("請先輸入文字");
   try {
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": makePng() })]);
-    say("已複製透明 PNG");
+    // Safari 需在點擊當下建立 ClipboardItem，並以 Promise 傳入 blob
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blobOf() })]);
+    say("已複製 PNG");
   } catch (e) {
-    const blob = await makePng();
-    download(blob);
-    say("此瀏覽器無法複製，已改為下載");
+    const blob = await blobOf();
+    if (blob) { download(blob); say("此瀏覽器無法複製，已改為下載"); }
   }
 }
 
-out.addEventListener("click", copyImage);
-out.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") copyImage(); });
+$("out").addEventListener("click", copyImage);
+$("out").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") copyImage(); });
 $("dl").addEventListener("click", async () => {
-  const blob = await makePng();
+  const blob = await blobOf();
   if (!blob) return say("請先輸入文字");
   download(blob);
 });
