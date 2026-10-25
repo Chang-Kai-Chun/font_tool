@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>字體轉換工具</title>
+<style>
+@font-face{font-family:"GenRyuMin";font-weight:300;src:url(fonts/GenRyuMin2TW-L.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"GenRyuMin";font-weight:500;src:url(fonts/GenRyuMin2TW-M.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"GenRyuMin";font-weight:700;src:url(fonts/GenRyuMin2TW-B.woff2) format("woff2");font-display:swap}
+
+:root{--bg:#f6f4ef;--card:#fff;--ink:#222;--sub:#777;--line:#ddd8cc;--accent:#8b3a2f}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#18181a;--card:#242427;--ink:#eee;--sub:#999;--line:#3a3a3f;--accent:#e0907f}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+main{max-width:520px;margin:0 auto;display:grid;gap:14px}
+h1{font-size:20px;margin:8px 0 0}
+label{font-size:13px;color:var(--sub);display:block;margin-bottom:6px}
+textarea,select{width:100%;font-size:16px;padding:12px;border:1px solid var(--line);
+  border-radius:10px;background:var(--card);color:var(--ink);font-family:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px;align-items:end}
+.row>div:first-child{flex:1}
+input[type=color]{width:48px;height:46px;padding:2px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+#out{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:20px 16px;
+  min-height:120px;font-size:32px;line-height:1.5;word-break:break-word;white-space:pre-wrap;
+  font-family:"Times New Roman",Times,"Liberation Serif","GenRyuMin",serif;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#out:empty::before{content:"轉換結果會顯示在這裡";color:var(--sub);font:14px system-ui,sans-serif}
+#out:active{opacity:.7}
+.hint{font-size:13px;color:var(--sub);text-align:center;margin:0}
+#toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translate(-50%,20px);
+  background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;
+  opacity:0;pointer-events:none;transition:.25s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+button{font-size:14px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--accent);width:100%}
+</style>
+</head>
+<body>
+<main>
+  <h1>字體轉換工具</h1>
+
+  <div>
+    <label for="txt">輸入文字</label>
+    <textarea id="txt" placeholder="輸入中文或 English">源流明體 Genryu Min 123</textarea>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="wt">字重（中文：源流明體／英文：Times New Roman）</label>
+      <select id="wt">
+        <option value="300">L　Light</option>
+        <option value="500" selected>M　Medium</option>
+        <option value="700">B　Bold</option>
+      </select>
+    </div>
+    <div>
+      <label for="clr">顏色</label>
+      <input id="clr" type="color" value="#000000">
+    </div>
+  </div>
+
+  <div id="out" role="button" tabindex="0" aria-label="點擊複製透明背景 PNG"></div>
+  <p class="hint">點一下上方文字，複製透明背景 PNG</p>
+  <button id="dl" type="button">下載 PNG</button>
+</main>
+<div id="toast"></div>
+
+<script>
+const FAMILY = '"Times New Roman", Times, "Liberation Serif", "GenRyuMin", serif';
+const $ = id => document.getElementById(id);
+const txt = $("txt"), wt = $("wt"), clr = $("clr"), out = $("out"), toast = $("toast");
+
+function render() {
+  out.textContent = txt.value;
+  out.style.fontWeight = wt.value;
+  out.style.color = clr.value;
+}
+[txt, wt, clr].forEach(el => el.addEventListener("input", render));
+render();
+
+let toastTimer;
+function say(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+}
+
+// 以 3 倍解析度繪製到透明 canvas，回傳 PNG Blob
+async function makePng() {
+  const text = txt.value.trim();
+  if (!text) return null;
+  const size = 64, scale = 3, pad = 16, maxW = 1000;
+  const font = `${wt.value} ${size * scale}px ${FAMILY}`;
+  await document.fonts.load(font, text);
+
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  ctx.font = font;
+
+  // 依最大寬度逐字換行（保留使用者的換行）
+  const lines = [];
+  for (const para of text.split("\n")) {
+    let line = "";
+    for (const ch of para) {
+      if (line && ctx.measureText(line + ch).width > maxW * scale) { lines.push(line); line = ""; }
+      line += ch;
+    }
+    lines.push(line);
+  }
+  const lh = size * scale * 1.5;
+  const w = Math.ceil(Math.max(...lines.map(l => ctx.measureText(l).width))) + pad * 2 * scale;
+  c.width = w;
+  c.height = Math.ceil(lh * lines.length) + pad * 2 * scale;
+
+  ctx.font = font;              // 改變尺寸後 context 會重置
+  ctx.fillStyle = clr.value;
+  ctx.textBaseline = "middle";
+  lines.forEach((l, i) => ctx.fillText(l, pad * scale, pad * scale + lh * (i + 0.5)));
+  return new Promise(r => c.toBlob(r, "image/png"));
+}
+
+function download(blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "text.png";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function copyImage() {
+  // Safari 需在點擊當下建立 ClipboardItem，並以 Promise 傳入 blob
+  if (!txt.value.trim()) return say("請先輸入文字");
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": makePng() })]);
+    say("已複製透明 PNG");
+  } catch (e) {
+    const blob = await makePng();
+    download(blob);
+    say("此瀏覽器無法複製，已改為下載");
+  }
+}
+
+out.addEventListener("click", copyImage);
+out.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") copyImage(); });
+$("dl").addEventListener("click", async () => {
+  const blob = await makePng();
+  if (!blob) return say("請先輸入文字");
+  download(blob);
+});
+</script>
+</body>
+</html>
