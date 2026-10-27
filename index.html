@@ -93,6 +93,10 @@ input[type=color]:disabled{opacity:.4}
       </div>
     </div>
     <div class="sl">
+      <label for="fs">字體大小</label><output id="fsv"></output>
+      <input id="fs" type="range" min="16" max="200" step="2" value="64">
+    </div>
+    <div class="sl">
       <label for="ls">字元間距</label><output id="lsv"></output>
       <input id="ls" type="range" min="-5" max="40" step="1" value="0">
     </div>
@@ -128,7 +132,6 @@ const cv = $("cv"), toast = $("toast");
 let align = "center";
 
 const S = 3;            // 輸出解析度倍率
-const BASE = 64;        // 基準字級 (px)
 const MAX_LINE = 1000;  // 單行最大寬度 (px)
 
 function readOpts() {
@@ -137,6 +140,7 @@ function readOpts() {
     weight: $("wt").value,
     color: $("clr").value,
     align,
+    fs: +$("fs").value,
     ls: +$("ls").value,
     lh: +$("lh").value,
     bgOn: $("bgOn").checked,
@@ -162,7 +166,7 @@ async function draw() {
   const text = o.text.replace(/\s+$/, "");
   if (!text) { cv.width = cv.height = 0; return false; }
 
-  const size = BASE * S;
+  const size = o.fs * S;
   const font = `${o.weight} ${size}px ${FAMILY}`;
   try { await document.fonts.load(font, text); } catch {}
 
@@ -227,6 +231,7 @@ async function draw() {
 let ready = Promise.resolve(true), seq = 0;
 function render() {
   const mine = ++seq;
+  $("fsv").textContent = $("fs").value + " px";
   $("lsv").textContent = $("ls").value + " px";
   $("lhv").textContent = (+$("lh").value).toFixed(1);
   $("padv").textContent = $("pad").value + " px";
